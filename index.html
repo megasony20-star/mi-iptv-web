@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IPTV Web Player Pro</title>
+  <title>IPTV Web Player</title>
+  <!-- Motor de reproducción HLS -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <style>
     :root {
@@ -34,6 +35,7 @@
       overflow: hidden;
     }
 
+    /* Barra Superior */
     header {
       background-color: var(--bg-panel);
       padding: 10px 18px;
@@ -51,7 +53,7 @@
       color: var(--accent);
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
 
     .controls-top {
@@ -109,12 +111,14 @@
       display: none;
     }
 
+    /* Estructura Principal */
     .main-container {
       display: flex;
       flex: 1;
       height: calc(100vh - 60px);
     }
 
+    /* Reproductor de Video */
     .player-section {
       flex: 1;
       background-color: #000;
@@ -143,4 +147,451 @@
       pointer-events: none;
       backdrop-filter: blur(4px);
       border: 1px solid var(--border);
-      max-width: 8
+      max-width: 80%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Barra Lateral */
+    .sidebar {
+      width: 380px;
+      background-color: var(--bg-panel);
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--border);
+    }
+
+    .search-bar {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: var(--bg-card);
+      color: var(--text-muted);
+      padding: 6px;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #0b0f19;
+      font-weight: bold;
+    }
+
+    .channel-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+    }
+
+    .channel-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-bottom: 4px;
+    }
+
+    .channel-item:hover {
+      background-color: var(--bg-card);
+    }
+
+    .channel-item.active {
+      background-color: rgba(56, 189, 248, 0.15);
+      border-left: 3px solid var(--accent);
+    }
+
+    .channel-logo {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+      border-radius: 4px;
+      background-color: #0b0f19;
+      flex-shrink: 0;
+    }
+
+    .channel-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .channel-name {
+      font-size: 0.85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .channel-group {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .fav-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 4px 6px;
+    }
+
+    .fav-btn.active {
+      color: var(--star-active);
+    }
+
+    /* Adaptación Móvil */
+    @media (max-width: 850px) {
+      .main-container {
+        flex-direction: column;
+      }
+      .player-section {
+        height: 35vh;
+        flex: none;
+      }
+      video {
+        max-height: 35vh;
+      }
+      .sidebar {
+        width: 100%;
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span>📺 IPTV Player</span>
+    </div>
+    <div class="controls-top">
+      <input type="text" id="m3uUrl" list="savedUrls" placeholder="URL M3U/M3U8..." style="min-width: 220px;">
+      <datalist id="savedUrls"></datalist>
+
+      <label class="cors-toggle" title="Actívalo si el stream o lista se bloquea por CORS">
+        <input type="checkbox" id="useCorsProxy">
+        <span>Proxy CORS</span>
+      </label>
+
+      <button onclick="cargarDesdeUrl()">Cargar</button>
+      <label class="file-label" for="fileInput">Archivo</label>
+      <input type="file" id="fileInput" accept=".m3u,.m3u8">
+    </div>
+  </header>
+
+  <div class="main-container">
+    <!-- Reproductor -->
+    <div class="player-section">
+      <div id="nowPlaying" class="now-playing" style="display:none;">
+        En vivo: <span id="currentTitle" style="color: var(--accent);">-</span>
+      </div>
+      <video id="videoPlayer" controls autoplay playsinline></video>
+    </div>
+
+    <!-- Panel de canales -->
+    <div class="sidebar">
+      <div class="search-bar">
+        <div class="tabs">
+          <button id="tabAll" class="tab-btn active" onclick="cambiarPestaña('ALL')">Todos (<span id="countAll">0</span>)</button>
+          <button id="tabFavs" class="tab-btn" onclick="cambiarPestaña('FAVS')">⭐ Favoritos (<span id="countFavs">0</span>)</button>
+        </div>
+        <input type="text" id="searchInput" placeholder="Buscar canal..." oninput="filtrarCanales()">
+        <select id="groupSelect" onchange="filtrarCanales()">
+          <option value="ALL">Todas las categorías</option>
+        </select>
+      </div>
+      <div id="channelList" class="channel-list">
+        <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 0.85rem;">
+          Cargando canales...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // LISTA DE CANALES FIJOS: Agrega, edita o elimina tus canales en este bloque
+    // =========================================================================
+    const MIS_CANALES_FIJOS = [
+      {
+        name: "RTVE 24 Horas",
+        group: "Noticias",
+        logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/24h_rtve.svg/200px-24h_rtve.svg.png",
+        url: "https://rtvelivestream.akamaized.net/rtvesec/24h/24h_main.m3u8"
+      },
+      {
+        name: "DW Español",
+        group: "Noticias",
+        logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Deutsche_Welle_symbol_2012.svg/200px-Deutsche_Welle_symbol_2012.svg.png",
+        url: "https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8"
+      },
+      {
+        name: "Canal Congreso México",
+        group: "Institucional",
+        logo: "",
+        url: "https://canaldelcongreso.tv/stream/envivo.m3u8"
+      }
+    ];
+
+    let canales = [...MIS_CANALES_FIJOS];
+    let vistaActual = 'ALL';
+    let favoritos = JSON.parse(localStorage.getItem('iptv_favoritos') || '[]');
+    let listasGuardadas = JSON.parse(localStorage.getItem('iptv_listas') || '[]');
+    
+    const video = document.getElementById('videoPlayer');
+    const proxyUrl = 'https://corsproxy.io/?';
+    let hls = null;
+
+    function guardarHistorialUrl(url) {
+      if (!listasGuardadas.includes(url)) {
+        listasGuardadas.unshift(url);
+        if (listasGuardadas.length > 5) listasGuardadas.pop();
+        localStorage.setItem('iptv_listas', JSON.stringify(listasGuardadas));
+        actualizarDatalist();
+      }
+    }
+
+    function actualizarDatalist() {
+      const datalist = document.getElementById('savedUrls');
+      datalist.innerHTML = '';
+      listasGuardadas.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u;
+        datalist.appendChild(opt);
+      });
+    }
+
+    function toggleFavorito(event, canal) {
+      event.stopPropagation();
+      const id = canal.url;
+      const index = favoritos.indexOf(id);
+
+      if (index === -1) {
+        favoritos.push(id);
+      } else {
+        favoritos.splice(index, 1);
+      }
+
+      localStorage.setItem('iptv_favoritos', JSON.stringify(favoritos));
+      actualizarContadores();
+      filtrarCanales();
+    }
+
+    function cambiarPestaña(tab) {
+      vistaActual = tab;
+      document.getElementById('tabAll').classList.toggle('active', tab === 'ALL');
+      document.getElementById('tabFavs').classList.toggle('active', tab === 'FAVS');
+      filtrarCanales();
+    }
+
+    function reproducir(url, title) {
+      document.getElementById('nowPlaying').style.display = 'block';
+      document.getElementById('currentTitle').innerText = title;
+
+      const useCors = document.getElementById('useCorsProxy').checked;
+      let finalUrl = url;
+      if (useCors && !url.startsWith(proxyUrl)) {
+        finalUrl = proxyUrl + encodeURIComponent(url);
+      }
+
+      if (Hls.isSupported()) {
+        if (hls) hls.destroy();
+
+        hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true
+        });
+
+        hls.loadSource(finalUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(e => console.log('Autoplay bloqueado:', e));
+        });
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                hls.recoverMediaError();
+                break;
+              default:
+                hls.destroy();
+                break;
+            }
+          }
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Soporte nativo para Safari (macOS / iOS)
+        video.src = finalUrl;
+        video.addEventListener('loadedmetadata', () => video.play());
+      }
+    }
+
+    function parseM3U(contenido) {
+      const lineas = contenido.split(/\r?\n/);
+      const lista = [];
+      let itemActual = null;
+
+      for (let i = 0; i < lineas.length; i++) {
+        const linea = lineas[i].trim();
+        if (linea.startsWith('#EXTINF:')) {
+          itemActual = {};
+          const comaIdx = linea.lastIndexOf(',');
+          itemActual.name = comaIdx !== -1 ? linea.substring(comaIdx + 1).trim() : 'Canal sin nombre';
+          const logoMatch = linea.match(/tvg-logo="([^"]*)"/i);
+          itemActual.logo = logoMatch ? logoMatch[1] : '';
+          const groupMatch = linea.match(/group-title="([^"]*)"/i);
+          itemActual.group = groupMatch ? groupMatch[1] : 'General';
+        } else if (linea && !linea.startsWith('#') && itemActual) {
+          itemActual.url = linea;
+          lista.push(itemActual);
+          itemActual = null;
+        }
+      }
+      return lista;
+    }
+
+    function actualizarContadores() {
+      document.getElementById('countAll').innerText = canales.length;
+      const favsCount = canales.filter(c => favoritos.includes(c.url)).length;
+      document.getElementById('countFavs').innerText = favsCount;
+    }
+
+    function actualizarCategorias() {
+      const select = document.getElementById('groupSelect');
+      const grupos = new Set(canales.map(c => c.group || 'General'));
+      select.innerHTML = '<option value="ALL">Todas las categorías</option>';
+      grupos.forEach(grupo => {
+        const opt = document.createElement('option');
+        opt.value = grupo;
+        opt.innerText = grupo;
+        select.appendChild(opt);
+      });
+      actualizarContadores();
+    }
+
+    function renderizarLista(items) {
+      const container = document.getElementById('channelList');
+      container.innerHTML = '';
+
+      if (items.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-muted); margin-top: 30px; font-size: 0.85rem;">No hay canales en esta sección.</div>';
+        return;
+      }
+
+      items.forEach((canal) => {
+        const esFav = favoritos.includes(canal.url);
+        const el = document.createElement('div');
+        el.className = 'channel-item';
+        el.onclick = () => {
+          document.querySelectorAll('.channel-item').forEach(i => i.classList.remove('active'));
+          el.classList.add('active');
+          reproducir(canal.url, canal.name);
+        };
+
+        const img = canal.logo 
+          ? `<img src="${canal.logo}" class="channel-logo" onerror="this.style.display='none'">` 
+          : '<div class="channel-logo" style="display:flex;align-items:center;justify-content:center;font-size:16px;">📺</div>';
+
+        el.innerHTML = `
+          ${img}
+          <div class="channel-info">
+            <div class="channel-name">${canal.name}</div>
+            <div class="channel-group">${canal.group}</div>
+          </div>
+          <button class="fav-btn ${esFav ? 'active' : ''}" title="Favorito">${esFav ? '★' : '☆'}</button>
+        `;
+
+        el.querySelector('.fav-btn').onclick = (e) => toggleFavorito(e, canal);
+        container.appendChild(el);
+      });
+    }
+
+    function filtrarCanales() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const group = document.getElementById('groupSelect').value;
+
+      const filtrados = canales.filter(c => {
+        const esFavorito = favoritos.includes(c.url);
+        if (vistaActual === 'FAVS' && !esFavorito) return false;
+
+        const coincideNombre = c.name.toLowerCase().includes(search);
+        const coincideGrupo = (group === 'ALL' || c.group === group);
+        return coincideNombre && coincideGrupo;
+      });
+
+      renderizarLista(filtrados);
+    }
+
+    async function cargarDesdeUrl() {
+      let url = document.getElementById('m3uUrl').value.trim();
+      if (!url) return alert('Por favor ingresa una URL válida.');
+
+      guardarHistorialUrl(url);
+
+      const useCors = document.getElementById('useCorsProxy').checked;
+      let urlFinal = url;
+      if (useCors) {
+        urlFinal = proxyUrl + encodeURIComponent(url);
+      }
+
+      try {
+        const res = await fetch(urlFinal);
+        if (!res.ok) throw new Error('Error al cargar la lista');
+        const text = await res.text();
+        const descargados = parseM3U(text);
+        canales = [...MIS_CANALES_FIJOS, ...descargados];
+        actualizarCategorias();
+        filtrarCanales();
+      } catch (err) {
+        alert('No se pudo cargar la lista externa. Si el enlace es de otro dominio, prueba activando la casilla "Proxy CORS".');
+        console.error(err);
+      }
+    }
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const importados = parseM3U(event.target.result);
+        canales = [...MIS_CANALES_FIJOS, ...importados];
+        actualizarCategorias();
+        filtrarCanales();
+      };
+      reader.readAsText(file);
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      actualizarDatalist();
+      actualizarCategorias();
+      filtrarCanales();
+    });
+  </script>
+</body>
+</html>
