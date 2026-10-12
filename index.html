@@ -368,7 +368,7 @@
     // =========================================================================
     const MIS_CANALES_FIJOS = [
       {
-        id: "24h.es",
+        id: "ENT Family",
         name: "RTVE 24 Horas",
         group: "Noticias",
         logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/24h_rtve.svg/200px-24h_rtve.svg.png",
@@ -638,8 +638,8 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       // Demo por defecto con EPG pública de España
-      document.getElementById('m3uUrl').value = 'https://iptv-org.github.io/iptv/countries/mx.m3u';
-      document.getElementById('epgUrl').value = 'https://iptv-org.github.io/epg/guides/mx/mx.xml';
+      document.getElementById('m3uUrl').value = '';
+      document.getElementById('epgUrl').value = 'https://api.40mediagroup.com/xmltv/programacion/entfamily/guia.json';
       
       actualizarCategorias();
       filtrarCanales();
