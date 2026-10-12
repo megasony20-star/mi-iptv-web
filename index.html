@@ -365,11 +365,25 @@
     // =========================================================================
     const MIS_CANALES_FIJOS = [
       {
+        name: "ENT Channel",
+        group: "Entretenimiento",
+        logo: "https://www.40mediagroup.com/images/channels/ent-channel.png",
+        url: "https://cdn.40mediagroup.com/live/c7eds/ENT_Channel/SA_LIVE_hls_enc/tracks-v1a1/mono.ts.m3u8", // Reemplaza por la URL de stream .m3u8 real de ENT Family
+        epgUrl: "https://api.40mediagroup.com/xmltv/programacion/entchannel/ahora.json"
+      },
+      {
         name: "ENT Family",
         group: "Entretenimiento",
         logo: "https://www.40mediagroup.com/images/channels/ent-family.png",
         url: "https://cdn.40mediagroup.com/live/c7eds/ENT_Family/SA_LIVE_hls_enc/tracks-v1a1/mono.ts.m3u8", // Reemplaza por la URL de stream .m3u8 real de ENT Family
-        epgUrl: "https://api.40mediagroup.com/xmltv/programacion/entfamily/guia.json"
+        epgUrl: "https://api.40mediagroup.com/xmltv/programacion/entchannel/ahora.json"
+      },
+      {
+        name: "RTVE 24 Horas",
+        group: "Noticias",
+        logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/24h_rtve.svg/200px-24h_rtve.svg.png",
+        url: "https://rtvelivestream.akamaized.net/rtvesec/24h/24h_main.m3u8",
+        epgUrl: ""
       },
       {
         name: "RTVE 24 Horas",
@@ -378,6 +392,7 @@
         url: "https://rtvelivestream.akamaized.net/rtvesec/24h/24h_main.m3u8",
         epgUrl: ""
       }
+      
     ];
 
     let canales = [...MIS_CANALES_FIJOS];
