@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IPTV Web Player con EPG</title>
+  <title>IPTV Web Player</title>
+  <!-- Motor de reproducción HLS -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <style>
     :root {
@@ -128,16 +129,16 @@
       background-color: #000;
     }
 
-    /* Tarjeta EPG en pantalla */
+    /* Tarjeta Superpuesta EPG */
     .epg-overlay {
       position: absolute;
       bottom: 24px;
       left: 24px;
       background: rgba(11, 15, 25, 0.88);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px 18px;
-      max-width: 480px;
+      border-radius: 10px;
+      padding: 12px 16px;
+      max-width: 440px;
       width: calc(100% - 48px);
       backdrop-filter: blur(8px);
       display: none;
@@ -148,19 +149,19 @@
       font-size: 0.95rem;
       font-weight: 700;
       color: var(--accent);
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     .epg-title {
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       font-weight: 600;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .epg-time {
       font-size: 0.75rem;
       color: var(--text-muted);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .epg-bar {
@@ -272,11 +273,6 @@
       text-overflow: ellipsis;
     }
 
-    .channel-group {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-    }
-
     .fav-btn {
       background: transparent;
       border: none;
@@ -312,29 +308,29 @@
 
   <header>
     <div class="brand">
-      <span>📺 IPTV + EPG</span>
+      <span>📺 IPTV Player</span>
     </div>
     <div class="controls-top">
-      <input type="text" id="m3uUrl" placeholder="URL M3U..." style="min-width: 180px;">
-      <input type="text" id="epgUrl" placeholder="URL EPG (XMLTV)..." style="min-width: 180px;">
-      
-      <label class="cors-toggle" title="Actívalo si los enlaces bloquean la descarga por CORS">
+      <input type="text" id="m3uUrl" list="savedUrls" placeholder="URL M3U/M3U8..." style="min-width: 200px;">
+      <datalist id="savedUrls"></datalist>
+
+      <label class="cors-toggle" title="Actívalo si la lista, el stream o el JSON bloquean la petición por CORS">
         <input type="checkbox" id="useCorsProxy">
         <span>Proxy CORS</span>
       </label>
 
-      <button onclick="cargarTodo()">Cargar</button>
-      <label class="file-label" for="fileInput">M3U Local</label>
+      <button onclick="cargarDesdeUrl()">Cargar M3U</button>
+      <label class="file-label" for="fileInput">Archivo</label>
       <input type="file" id="fileInput" accept=".m3u,.m3u8">
     </div>
   </header>
 
   <div class="main-container">
+    <!-- Reproductor -->
     <div class="player-section">
-      <!-- Tarjeta EPG Superpuesta -->
       <div id="epgOverlay" class="epg-overlay">
         <div id="epgChannel" class="epg-channel-header">-</div>
-        <div id="epgTitle" class="epg-title">Sin información de guía</div>
+        <div id="epgTitle" class="epg-title">Transmisión en directo</div>
         <div id="epgTime" class="epg-time">--:-- - --:--</div>
         <div class="epg-bar">
           <div id="epgProgress" class="epg-progress"></div>
@@ -343,6 +339,7 @@
       <video id="videoPlayer" controls autoplay playsinline></video>
     </div>
 
+    <!-- Panel Lateral -->
     <div class="sidebar">
       <div class="search-bar">
         <div class="tabs">
@@ -356,7 +353,7 @@
       </div>
       <div id="channelList" class="channel-list">
         <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 0.85rem;">
-          Cargando canales y guía...
+          Cargando canales...
         </div>
       </div>
     </div>
@@ -364,58 +361,111 @@
 
   <script>
     // =========================================================================
-    // CANALES FIJOS CON IDENTIFICADOR EPG (tvg_id)
+    // LISTA DE CANALES FIJOS (Agrega aquí tus canales y sus URLs de guía JSON)
     // =========================================================================
     const MIS_CANALES_FIJOS = [
       {
         name: "ENT Family",
         group: "Entretenimiento",
-        logo: "https://www.40mediagroup.com/images/channels/ent-family.png", // pon aquí el logo si lo tienes
-        url: "https://cdn.40mediagroup.com/live/c7eds/ENT_Family/SA_LIVE_hls_enc/tracks-v1a1/mono.ts.m3u8", // pon aquí el stream m3u8
+        logo: "",
+        url: "https://rtvelivestream.akamaized.net/rtvesec/24h/24h_main.m3u8", // Reemplaza por la URL de stream .m3u8 real de ENT Family
         epgUrl: "https://api.40mediagroup.com/xmltv/programacion/entfamily/guia.json"
       },
       {
-        id: "DWEspanol.de",
-        name: "DW Español",
+        name: "RTVE 24 Horas",
         group: "Noticias",
-        logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Deutsche_Welle_symbol_2012.svg/200px-Deutsche_Welle_symbol_2012.svg.png",
-        url: "https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8"
+        logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/24h_rtve.svg/200px-24h_rtve.svg.png",
+        url: "https://rtvelivestream.akamaized.net/rtvesec/24h/24h_main.m3u8",
+        epgUrl: ""
       }
     ];
 
     let canales = [...MIS_CANALES_FIJOS];
-    let epgData = {}; // Diccionario con id_canal -> [programas]
     let canalActivo = null;
+    let guiaJsonActual = [];
     let vistaActual = 'ALL';
     let favoritos = JSON.parse(localStorage.getItem('iptv_favoritos') || '[]');
+    let listasGuardadas = JSON.parse(localStorage.getItem('iptv_listas') || '[]');
     
     const video = document.getElementById('videoPlayer');
     const proxyUrl = 'https://corsproxy.io/?';
     let hls = null;
 
-    // Parser de fecha estándar XMLTV (Ej: "20261012143000 +0000")
-    function parseXmltvDate(dateStr) {
-      if (!dateStr) return null;
-      const clean = dateStr.trim();
-      const year = clean.substring(0, 4);
-      const month = clean.substring(4, 6) - 1;
-      const day = clean.substring(6, 8);
-      const hour = clean.substring(8, 10);
-      const min = clean.substring(10, 12);
-      const sec = clean.substring(12, 14) || '00';
-      return new Date(Date.UTC(year, month, day, hour, min, sec));
+    // --- MANEJO DE EPG JSON ---
+    function parseFechaGenerica(val) {
+      if (!val) return null;
+      if (typeof val === 'number') {
+        return new Date(val > 1e11 ? val : val * 1000);
+      }
+      if (typeof val === 'string') {
+        // Soporta formatos estándar ISO o cadenas numéricas
+        if (/^\d+$/.test(val.trim())) {
+          const num = parseInt(val.trim(), 10);
+          return new Date(num > 1e11 ? num : num * 1000);
+        }
+        return new Date(val);
+      }
+      return null;
     }
 
-    // Obtener programa en vivo para un canal
-    function obtenerProgramaActual(channelId) {
-      const programas = epgData[channelId];
-      if (!programas || programas.length === 0) return null;
+    async function cargarGuiaJson(canal) {
+      guiaJsonActual = [];
+      actualizarVistaEPG(null);
+
+      if (!canal || !canal.epgUrl) return;
+
+      const useCors = document.getElementById('useCorsProxy').checked;
+      const urlFinal = useCors ? proxyUrl + encodeURIComponent(canal.epgUrl) : canal.epgUrl;
+
+      try {
+        const res = await fetch(urlFinal);
+        if (!res.ok) throw new Error('Error al consultar EPG');
+        const data = await res.json();
+
+        // Extraer arreglo si viene encapsulado en propiedades comunes
+        if (Array.isArray(data)) {
+          guiaJsonActual = data;
+        } else if (data.programas && Array.isArray(data.programas)) {
+          guiaJsonActual = data.programas;
+        } else if (data.programs && Array.isArray(data.programs)) {
+          guiaJsonActual = data.programs;
+        } else if (data.guia && Array.isArray(data.guia)) {
+          guiaJsonActual = data.guia;
+        } else if (data.data && Array.isArray(data.data)) {
+          guiaJsonActual = data.data;
+        } else {
+          // Si el objeto tiene llaves por día o por hora
+          guiaJsonActual = Object.values(data).filter(v => typeof v === 'object');
+        }
+
+        evaluarProgramaEnVivo();
+      } catch (err) {
+        console.warn('No se pudo procesar la guía JSON:', err);
+      }
+    }
+
+    function evaluarProgramaEnVivo() {
+      if (!canalActivo || guiaJsonActual.length === 0) {
+        actualizarVistaEPG(null);
+        return;
+      }
 
       const ahora = new Date();
-      return programas.find(p => p.start <= ahora && p.end >= ahora) || null;
+
+      const prog = guiaJsonActual.find(item => {
+        const dStart = parseFechaGenerica(item.start || item.inicio || item.start_time || item.hora_inicio || item.desde);
+        const dEnd = parseFechaGenerica(item.end || item.stop || item.fin || item.end_time || item.hora_fin || item.hasta);
+
+        if (dStart && dEnd && !isNaN(dStart) && !isNaN(dEnd)) {
+          return ahora >= dStart && ahora <= dEnd;
+        }
+        return false;
+      });
+
+      actualizarVistaEPG(prog);
     }
 
-    function actualizarOverlayEPG() {
+    function actualizarVistaEPG(prog) {
       const overlay = document.getElementById('epgOverlay');
       if (!canalActivo) {
         overlay.style.display = 'none';
@@ -425,62 +475,36 @@
       overlay.style.display = 'block';
       document.getElementById('epgChannel').innerText = canalActivo.name;
 
-      const prog = obtenerProgramaActual(canalActivo.id);
       if (prog) {
-        document.getElementById('epgTitle').innerText = prog.title;
-        
-        const formatoHora = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        document.getElementById('epgTime').innerText = `${formatoHora(prog.start)} - ${formatoHora(prog.end)}`;
+        const titulo = prog.title || prog.titulo || prog.name || prog.nombre || 'Programa en vivo';
+        document.getElementById('epgTitle').innerText = titulo;
 
-        const total = prog.end - prog.start;
-        const transcurrido = new Date() - prog.start;
-        const pct = Math.min(100, Math.max(0, (transcurrido / total) * 100));
-        document.getElementById('epgProgress').style.width = `${pct}%`;
+        const dStart = parseFechaGenerica(prog.start || prog.inicio || prog.start_time || prog.hora_inicio || prog.desde);
+        const dEnd = parseFechaGenerica(prog.end || prog.stop || prog.fin || prog.end_time || prog.hora_fin || prog.hasta);
+
+        if (dStart && dEnd && !isNaN(dStart) && !isNaN(dEnd)) {
+          const formato = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          document.getElementById('epgTime').innerText = `${formato(dStart)} - ${formato(dEnd)}`;
+
+          const total = dEnd - dStart;
+          const transcurrido = new Date() - dStart;
+          const pct = Math.min(100, Math.max(0, (transcurrido / total) * 100));
+          document.getElementById('epgProgress').style.width = `${pct}%`;
+        } else {
+          document.getElementById('epgTime').innerText = 'En emisión';
+          document.getElementById('epgProgress').style.width = '0%';
+        }
       } else {
-        document.getElementById('epgTitle').innerText = 'Sin información del programa';
-        document.getElementById('epgTime').innerText = '--:-- - --:--';
+        document.getElementById('epgTitle').innerText = 'Transmisión en vivo';
+        document.getElementById('epgTime').innerText = canalActivo.group || '';
         document.getElementById('epgProgress').style.width = '0%';
       }
     }
 
-    // Parsear archivo XMLTV (EPG)
-    async function cargarEPG(url) {
-      if (!url) return;
-      const useCors = document.getElementById('useCorsProxy').checked;
-      const urlFinal = useCors ? proxyUrl + encodeURIComponent(url) : url;
-
-      try {
-        const res = await fetch(urlFinal);
-        if (!res.ok) throw new Error('Error al descargar EPG');
-        const text = await res.text();
-        
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(text, 'text/xml');
-        const programmes = xml.querySelectorAll('programme');
-
-        epgData = {};
-        programmes.forEach(p => {
-          const channelId = p.getAttribute('channel');
-          const start = parseXmltvDate(p.getAttribute('start'));
-          const end = parseXmltvDate(p.getAttribute('stop'));
-          const title = p.querySelector('title') ? p.querySelector('title').textContent : 'Sin título';
-
-          if (channelId && start && end) {
-            if (!epgData[channelId]) epgData[channelId] = [];
-            epgData[channelId].push({ start, end, title });
-          }
-        });
-
-        actualizarOverlayEPG();
-        filtrarCanales();
-      } catch (err) {
-        console.warn('No se pudo procesar la guía EPG:', err);
-      }
-    }
-
+    // --- REPRODUCTOR ---
     function reproducir(canal) {
       canalActivo = canal;
-      actualizarOverlayEPG();
+      cargarGuiaJson(canal);
 
       const useCors = document.getElementById('useCorsProxy').checked;
       let finalUrl = canal.url;
@@ -490,43 +514,95 @@
 
       if (Hls.isSupported()) {
         if (hls) hls.destroy();
+
         hls = new Hls({ enableWorker: true, lowLatencyMode: true });
         hls.loadSource(finalUrl);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                hls.recoverMediaError();
+                break;
+              default:
+                hls.destroy();
+                break;
+            }
+          }
+        });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = finalUrl;
         video.addEventListener('loadedmetadata', () => video.play());
       }
     }
 
+    // --- PARSER M3U ---
     function parseM3U(contenido) {
       const lineas = contenido.split(/\r?\n/);
       const lista = [];
-      let item = null;
+      let itemActual = null;
 
       for (let i = 0; i < lineas.length; i++) {
-        const l = lineas[i].trim();
-        if (l.startsWith('#EXTINF:')) {
-          item = {};
-          const comaIdx = l.lastIndexOf(',');
-          item.name = comaIdx !== -1 ? l.substring(comaIdx + 1).trim() : 'Canal';
-          
-          const idMatch = l.match(/tvg-id="([^"]*)"/i);
-          item.id = idMatch ? idMatch[1] : item.name;
-
-          const logoMatch = l.match(/tvg-logo="([^"]*)"/i);
-          item.logo = logoMatch ? logoMatch[1] : '';
-
-          const groupMatch = l.match(/group-title="([^"]*)"/i);
-          item.group = groupMatch ? groupMatch[1] : 'General';
-        } else if (l && !l.startsWith('#') && item) {
-          item.url = l;
-          lista.push(item);
-          item = null;
+        const linea = lineas[i].trim();
+        if (linea.startsWith('#EXTINF:')) {
+          itemActual = {};
+          const comaIdx = linea.lastIndexOf(',');
+          itemActual.name = comaIdx !== -1 ? linea.substring(comaIdx + 1).trim() : 'Canal';
+          const logoMatch = linea.match(/tvg-logo="([^"]*)"/i);
+          itemActual.logo = logoMatch ? logoMatch[1] : '';
+          const groupMatch = linea.match(/group-title="([^"]*)"/i);
+          itemActual.group = groupMatch ? groupMatch[1] : 'General';
+          itemActual.epgUrl = '';
+        } else if (linea && !linea.startsWith('#') && itemActual) {
+          itemActual.url = linea;
+          lista.push(itemActual);
+          itemActual = null;
         }
       }
       return lista;
+    }
+
+    function toggleFavorito(event, canal) {
+      event.stopPropagation();
+      const id = canal.url;
+      const index = favoritos.indexOf(id);
+
+      if (index === -1) favoritos.push(id);
+      else favoritos.splice(index, 1);
+
+      localStorage.setItem('iptv_favoritos', JSON.stringify(favoritos));
+      actualizarContadores();
+      filtrarCanales();
+    }
+
+    function cambiarPestaña(tab) {
+      vistaActual = tab;
+      document.getElementById('tabAll').classList.toggle('active', tab === 'ALL');
+      document.getElementById('tabFavs').classList.toggle('active', tab === 'FAVS');
+      filtrarCanales();
+    }
+
+    function actualizarContadores() {
+      document.getElementById('countAll').innerText = canales.length;
+      const favsCount = canales.filter(c => favoritos.includes(c.url)).length;
+      document.getElementById('countFavs').innerText = favsCount;
+    }
+
+    function actualizarCategorias() {
+      const select = document.getElementById('groupSelect');
+      const grupos = new Set(canales.map(c => c.group || 'General'));
+      select.innerHTML = '<option value="ALL">Todas las categorías</option>';
+      grupos.forEach(grupo => {
+        const opt = document.createElement('option');
+        opt.value = grupo;
+        opt.innerText = grupo;
+        select.appendChild(opt);
+      });
+      actualizarContadores();
     }
 
     function renderizarLista(items) {
@@ -534,14 +610,12 @@
       container.innerHTML = '';
 
       if (items.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: var(--text-muted); margin-top: 30px; font-size: 0.85rem;">No hay canales.</div>';
+        container.innerHTML = '<div style="text-align: center; color: var(--text-muted); margin-top: 30px; font-size: 0.85rem;">No hay canales disponibles.</div>';
         return;
       }
 
       items.forEach((canal) => {
         const esFav = favoritos.includes(canal.url);
-        const prog = obtenerProgramaActual(canal.id);
-
         const el = document.createElement('div');
         el.className = 'channel-item' + (canalActivo === canal ? ' active' : '');
         el.onclick = () => {
@@ -558,20 +632,12 @@
           ${img}
           <div class="channel-info">
             <div class="channel-name">${canal.name}</div>
-            <div class="channel-program">${prog ? '▶ ' + prog.title : canal.group}</div>
+            <div class="channel-program">${canal.epgUrl ? '📅 Guía EPG disponible' : canal.group}</div>
           </div>
           <button class="fav-btn ${esFav ? 'active' : ''}">${esFav ? '★' : '☆'}</button>
         `;
 
-        el.querySelector('.fav-btn').onclick = (e) => {
-          e.stopPropagation();
-          const idx = favoritos.indexOf(canal.url);
-          if (idx === -1) favoritos.push(canal.url);
-          else favoritos.splice(idx, 1);
-          localStorage.setItem('iptv_favoritos', JSON.stringify(favoritos));
-          filtrarCanales();
-        };
-
+        el.querySelector('.fav-btn').onclick = (e) => toggleFavorito(e, canal);
         container.appendChild(el);
       });
     }
@@ -581,69 +647,61 @@
       const group = document.getElementById('groupSelect').value;
 
       const filtrados = canales.filter(c => {
-        const esFav = favoritos.includes(c.url);
-        if (vistaActual === 'FAVS' && !esFav) return false;
-        return c.name.toLowerCase().includes(search) && (group === 'ALL' || c.group === group);
+        const esFavorito = favoritos.includes(c.url);
+        if (vistaActual === 'FAVS' && !esFavorito) return false;
+
+        const coincideNombre = c.name.toLowerCase().includes(search);
+        const coincideGrupo = (group === 'ALL' || c.group === group);
+        return coincideNombre && coincideGrupo;
       });
 
-      document.getElementById('countAll').innerText = canales.length;
-      document.getElementById('countFavs').innerText = canales.filter(c => favoritos.includes(c.url)).length;
       renderizarLista(filtrados);
     }
 
-    function actualizarCategorias() {
-      const select = document.getElementById('groupSelect');
-      const grupos = new Set(canales.map(c => c.group || 'General'));
-      select.innerHTML = '<option value="ALL">Todas las categorías</option>';
-      grupos.forEach(g => {
-        const opt = document.createElement('option');
-        opt.value = g;
-        opt.innerText = g;
-        select.appendChild(opt);
-      });
-    }
+    async function cargarDesdeUrl() {
+      let url = document.getElementById('m3uUrl').value.trim();
+      if (!url) return alert('Por favor ingresa una URL válida.');
 
-    function cambiarPestaña(tab) {
-      vistaActual = tab;
-      document.getElementById('tabAll').classList.toggle('active', tab === 'ALL');
-      document.getElementById('tabFavs').classList.toggle('active', tab === 'FAVS');
-      filtrarCanales();
-    }
-
-    async function cargarTodo() {
-      const m3u = document.getElementById('m3uUrl').value.trim();
-      const epg = document.getElementById('epgUrl').value.trim();
       const useCors = document.getElementById('useCorsProxy').checked;
+      let urlFinal = useCors ? proxyUrl + encodeURIComponent(url) : url;
 
-      if (m3u) {
-        try {
-          const finalUrl = useCors ? proxyUrl + encodeURIComponent(m3u) : m3u;
-          const res = await fetch(finalUrl);
-          const txt = await res.text();
-          canales = [...MIS_CANALES_FIJOS, ...parseM3U(txt)];
-          actualizarCategorias();
-          filtrarCanales();
-        } catch (e) {
-          alert('Error cargando M3U.');
-        }
-      }
-
-      if (epg) {
-        cargarEPG(epg);
+      try {
+        const res = await fetch(urlFinal);
+        if (!res.ok) throw new Error('Error al cargar la lista');
+        const text = await res.text();
+        const descargados = parseM3U(text);
+        canales = [...MIS_CANALES_FIJOS, ...descargados];
+        actualizarCategorias();
+        filtrarCanales();
+      } catch (err) {
+        alert('No se pudo cargar la lista externa. Si da error de conexión, activa la casilla "Proxy CORS".');
       }
     }
 
-    // Actualiza la barra de progreso del programa cada minuto
-    setInterval(actualizarOverlayEPG, 60000);
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const importados = parseM3U(event.target.result);
+        canales = [...MIS_CANALES_FIJOS, ...importados];
+        actualizarCategorias();
+        filtrarCanales();
+      };
+      reader.readAsText(file);
+    });
+
+    // Revalúa el programa en emisión cada 30 segundos
+    setInterval(evaluarProgramaEnVivo, 30000);
 
     window.addEventListener('DOMContentLoaded', () => {
-      // Demo por defecto con EPG pública de España
-      document.getElementById('m3uUrl').value = '';
-      document.getElementById('epgUrl').value = 'https://api.40mediagroup.com/xmltv/programacion/entfamily/guia.json';
-      
       actualizarCategorias();
       filtrarCanales();
-      cargarTodo();
+      // Reproduce automáticamente el primer canal configurado
+      if (MIS_CANALES_FIJOS.length > 0) {
+        reproducir(MIS_CANALES_FIJOS[0]);
+      }
     });
   </script>
 </body>
